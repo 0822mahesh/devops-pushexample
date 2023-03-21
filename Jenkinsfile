@@ -9,50 +9,33 @@
    // }
 //}
 pipeline {
-    agent any
-
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Build Maven Project') {
-            steps {
-                sh 'mvn package'
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {
-                        def app = docker.build("your-dockerhub-username/your-webapp:${env.BUILD_NUMBER}", ".")
-                        app.push()
-                    }
-                }
-            }
-        }
-
-        stage('Docker Login') {
-            steps {
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {
-                        docker.login('your-dockerhub-username', credentialsId: 'dockerhub')
-                    }
-                }
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {
-                        docker.image("your-dockerhub-username/your-webapp:${env.BUILD_NUMBER}").push()
-                    }
-                }
-            }
-        }
+  agent any
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '5'))
+  }
+  environment {
+    DOCKERHUB_CREDENTIALS = credentials('dockerhub')
+  }
+  stages {
+    stage('Build') {
+      steps {
+        sh 'docker build -t lloydmatereke/jenkins-docker-hub .'
+      }
     }
+    stage('Login') {
+      steps {
+        sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+      }
+    }
+    stage('Push') {
+      steps {
+        sh 'docker push lloydmatereke/jenkins-docker-hub'
+      }
+    }
+  }
+  post {
+    always {
+      sh 'docker logout'
+    }
+  }
 }
